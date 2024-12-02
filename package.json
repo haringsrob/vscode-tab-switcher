@@ -3,11 +3,19 @@
   "displayName": "Tab Fuzzy Finder",
   "description": "Fuzzy find through open tabs in VS Code",
   "version": "0.0.1",
+  "publisher": "user",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/tab-fuzzy-finder"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -16,17 +24,29 @@
         "command": "tab-fuzzy-finder.findTab",
         "title": "Find Open Tab"
       }
+    ],
+    "keybindings": [
+      {
+        "command": "tab-fuzzy-finder.findTab",
+        "key": "cmd+e",
+        "mac": "cmd+e",
+        "win": "ctrl+e",
+        "linux": "ctrl+e",
+        "when": "editorTextFocus || editorIsOpen"
+      }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile"
+    "pretest": "npm run compile",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.80.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.24.0"
   }
 }

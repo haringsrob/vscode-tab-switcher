@@ -1,31 +1,42 @@
 import * as vscode from 'vscode';
 
-// Keep track of tab history
-let tabHistory: { uri: string, viewColumn: number }[] = [];
+// Keep track of current and previous tab
+let currentTab: { uri: string, viewColumn: number } | undefined;
+let previousTab: { uri: string, viewColumn: number } | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
     // Track active editor changes
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor((editor) => {
             if (editor) {
-                console.log('Editor changed:', editor.document.uri.toString());
-                updateTabHistory(editor.document.uri.toString(), editor.viewColumn || 1);
+                const newTab = {
+                    uri: editor.document.uri.toString(),
+                    viewColumn: editor.viewColumn || 1
+                };
+
+                // Only update if it's actually a different tab
+                if (currentTab?.uri !== newTab.uri) {
+                    previousTab = currentTab;
+                    currentTab = newTab;
+                }
             }
         })
     );
 
-    // Initialize with all currently open editors
-    initializeTabHistory();
+    // Initialize with current editor if any
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+        currentTab = {
+            uri: activeEditor.document.uri.toString(),
+            viewColumn: activeEditor.viewColumn || 1
+        };
+    }
 
     let disposable = vscode.commands.registerCommand('tab-fuzzy-finder.findTab', async () => {
         const tabGroups = vscode.window.tabGroups;
         
         // Get all open tabs across all groups
         const allTabs: { label: string, editor: vscode.TextDocument, viewColumn: number }[] = [];
-        
-        // Get current and previous tabs info
-        const currentTabInfo = tabHistory[0];
-        const previousTabInfo = tabHistory[1];
         
         // Add all tabs, marking current and previous appropriately
         tabGroups.all.forEach(group => {
@@ -35,10 +46,10 @@ export function activate(context: vscode.ExtensionContext) {
                     const document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === uri.toString());
                     if (document) {
                         let prefix = '';
-                        const tabInfo = uri.toString();
-                        if (previousTabInfo && tabInfo === previousTabInfo.uri) {
+                        const tabUri = uri.toString();
+                        if (previousTab && tabUri === previousTab.uri) {
                             prefix = '↩ '; // Previous tab
-                        } else if (currentTabInfo && tabInfo === currentTabInfo.uri) {
+                        } else if (currentTab && tabUri === currentTab.uri) {
                             prefix = '● '; // Current tab
                         }
                         
@@ -56,10 +67,10 @@ export function activate(context: vscode.ExtensionContext) {
         allTabs.sort((a, b) => {
             const aUri = a.editor.uri.toString();
             const bUri = b.editor.uri.toString();
-            if (previousTabInfo && aUri === previousTabInfo.uri) return -1;
-            if (previousTabInfo && bUri === previousTabInfo.uri) return 1;
-            if (currentTabInfo && aUri === currentTabInfo.uri) return -1;
-            if (currentTabInfo && bUri === currentTabInfo.uri) return 1;
+            if (previousTab && aUri === previousTab.uri) return -1;
+            if (previousTab && bUri === previousTab.uri) return 1;
+            if (currentTab && aUri === currentTab.uri) return -1;
+            if (currentTab && bUri === currentTab.uri) return 1;
             return 0;
         });
 
@@ -90,49 +101,6 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(disposable);
-}
-
-function initializeTabHistory() {
-    // Get all open tabs and add them to history
-    const tabGroups = vscode.window.tabGroups;
-    const activeTab = vscode.window.activeTextEditor;
-    
-    // First, add the active tab
-    if (activeTab) {
-        updateTabHistory(activeTab.document.uri.toString(), activeTab.viewColumn || 1);
-    }
-
-    // Then add all other tabs
-    tabGroups.all.forEach(group => {
-        group.tabs.forEach(tab => {
-            if (tab.input instanceof vscode.TabInputText) {
-                const uri = tab.input.uri.toString();
-                // Don't add the active tab again
-                if (!activeTab || uri !== activeTab.document.uri.toString()) {
-                    updateTabHistory(uri, group.viewColumn || 1);
-                }
-            }
-        });
-    });
-
-    console.log('Initialized tab history:', tabHistory);
-}
-
-function updateTabHistory(uri: string, viewColumn: number) {
-    console.log('Updating history with:', uri);
-    
-    // Remove the uri from history if it's already there
-    tabHistory = tabHistory.filter(tab => tab.uri !== uri);
-    
-    // Add it to the front of the history
-    tabHistory.unshift({ uri, viewColumn });
-    
-    // Keep only the last 10 tabs in history
-    if (tabHistory.length > 10) {
-        tabHistory = tabHistory.slice(0, 10);
-    }
-
-    console.log('Current history:', tabHistory);
 }
 
 function getGroupLabel(viewColumn: number | undefined): string {
